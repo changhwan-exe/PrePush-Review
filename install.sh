@@ -23,8 +23,8 @@ while IFS= read -r f; do
   cp "$HERE/files/$f" "$f"
   echo "[install] 복사      $f"
 done < <(cd "$HERE/files" && find . -type f | sed 's|^\./||' | sort)
-cp "$HERE/README.md" scripts/review/README.md
-echo "[install] 복사      scripts/review/README.md"
+cp "$HERE/README.md" "$HERE/README.ko.md" scripts/review/
+echo "[install] 복사      scripts/review/README.md · README.ko.md"
 
 # 셸 스크립트는 LF 여야 한다 (CRLF 면 bash 가 '\r' 때문에 실패)
 if ! grep -q 'review-gate' .gitattributes 2>/dev/null; then
