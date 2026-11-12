@@ -1,0 +1,20 @@
+# 리뷰 결과 (이 저장소에서 파이프라인을 돌렸을 때)
+.review/
+
+# Claude Code 개인 설정
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 에디터
+.vscode/
+.idea/
+*.swp
+*~
+
+# 로그 · 임시 파일
+*.log
+*.tmp
