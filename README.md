@@ -11,6 +11,45 @@ A Claude Code skill (`/prepush`) and scripts that have Claude sessions review yo
 
 > **Note:** the prompts, script messages, and review output are written in Korean. The pipeline works the same either way, but the reports in `.review/` will be in Korean.
 
+## Example — a real review run
+
+A trimmed record of a real review of a Unity multiplayer lobby-room screen change (10 files), translated from Korean (paths shortened).
+
+**Round 1** — the con side filed 2 problems · 3 design findings. The pro side accepted 3 and rebutted 2.
+
+```
+### Q-02 | category: design
+- Location: RoomPresenter.cs:350
+- Problem: the UI computes the bot ID ↔ number mapping (1000 + number) in reverse by itself.
+- Cost: if the bot ID rule changes, line 350 has to change too. Miss it and "Remove" requests
+  the wrong number and the button silently does nothing.
+
+VERDICT Q-02 REBUT                                                   ← pro
+- Line 350 doesn't use the literal 1000 but BotRoster.ActorBase (BotRoster.cs:17). It follows
+  the value if it changes, and removing the constant surfaces as a compile error.
+- The bot ID rule is marked final in the design doc. No upcoming task changes it.
+
+VERDICT Q-02 WITHDRAW                                                ← con
+- Checked the pro side's evidence against the code; it holds.
+```
+
+The 2 rebutted findings were withdrawn, and only the 2 accepted problems (`C-01` · `C-02`) were fixed and committed by the fixer.
+
+**Round 2** — fresh sessions reviewed only the diff just fixed, and caught **a bug introduced by the round-1 fix**.
+
+```
+### C-01 | severity: low
+- Location: RoomPresenter.cs:259
+- Problem: the newly added leaveConfirm.Show(isHost) ignores the "only when others are present"
+  condition. When the host leaves and one person remains, their confirm dialog now shows
+  "Host will pass to the next player."
+- Evidence: the only other place that opens the dialog (line 416) checks PlayerCount > 1.
+  Line 259 alone has no condition. Before the fix, the dialog stayed without the note;
+  the wrong message was introduced by this fix.
+```
+
+**Round 3** — check only. No findings → `PASS`.
+
 ## Flow
 
 ```
