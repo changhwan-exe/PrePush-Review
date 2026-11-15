@@ -67,7 +67,8 @@ VERDICT Q-02 WITHDRAW                                                ← 반대�
 
 ## 필요한 것
 
-- git, bash 4.4 이상 (Windows 는 Git Bash)
+- git 2.38 이상 (`git merge-tree --write-tree`), bash 4.4 이상 (Windows 는 Git Bash)
+- python 3 — 세션 결과(JSON)를 읽는 데 쓴다. `python3` 또는 `python` 이 없으면 시작하지 않는다
 - Claude Code CLI — `claude` 가 PATH 에 있어야 하고, 기본 스킬 `code-review` 가 들어 있는 버전 (2.1.322 에서 확인)
 
 ## 설치
@@ -128,8 +129,21 @@ bash scripts/review/prepush.sh --all src/network     # 한 폴더만
 
 | 모드 | 대상 | push |
 |---|---|---|
-| 푸시 전 | 기준 브랜치 이후 바뀐 코드 | 통과하면 함 (수정 커밋이 생겼으면 안 함) |
+| 푸시 전 | 아직 push 하지 않은 코드 (아래 「리뷰 범위」) | 통과하면 함 (수정 커밋이 생겼으면 안 함) |
 | 전체 `--all` | 이미 있는 코드 전체, 폴더별 | 안 함 |
+
+### 리뷰 범위 (푸시 전)
+
+시작할 때 `git fetch` 로 원격을 최신으로 맞춘 뒤, **이미 push 한 커밋은 다시 보지 않는다** — push 할 때 pre-push 훅이 리뷰 통과를 확인했기 때문이다.
+
+| 상황 | 비교 기준 |
+|---|---|
+| 처음 push 하는 브랜치 (`origin/<브랜치>` 없음) | 기준 브랜치(`REVIEW_BASE`)에서 갈라진 곳 |
+| 이미 push 한 브랜치 | `origin/<브랜치>` — 그 뒤 커밋만 |
+| push 한 뒤 기준 브랜치를 머지함 | `origin/<브랜치>` 와 그 기준 브랜치를 합친 트리 — 남이 기준 브랜치에 넣은 코드는 빠지고, 내 커밋 · 충돌 해결만 남는다 |
+| rebase · 남의 push 로 `origin/<브랜치>` 가 조상이 아님, 또는 합칠 때 충돌 | 경고 후 기준 브랜치에서 갈라진 곳 |
+
+`SKIP_REVIEW=1` 로 push 했거나 훅을 설치하지 않고 push 한 커밋도 「push 한 것」으로 보고 다시 보지 않는다.
 
 **문서 작업은 리뷰하지 않는다** — push 하는 커밋들이 `docs/` · `*.md` 만 바꿨으면 훅이 리뷰 없이 통과시킨다.
 
@@ -156,6 +170,8 @@ bash scripts/review/prepush.sh --all src/network     # 한 폴더만
 | `roundN/quality.md` | 설계 권고 — 고치지 않은 `Q-`. 고칠지는 사람이 정한다 |
 | `roundN/prior.md` | 그 라운드 세션에 넘긴 앞 라운드 기록 |
 | `withdrawn.md` | 라운드마다 철회된 지적 |
+| `usage.tsv` | 세션마다 한 줄 — 턴 · 입력 · 캐시 쓰기 · 캐시 읽기 · 출력 토큰 · 비용 · 초. `report.md` 끝 「토큰」 표가 이것을 합계와 함께 보여 준다 |
+| `*.md.json` · `*.md.err` | 세션의 원래 출력(`claude -p --output-format json`)과 오류 로그 |
 
 ## 판정 규칙
 
@@ -197,6 +213,7 @@ bash scripts/review/prepush.sh --all src/network     # 한 폴더만
 ## 주의
 
 - **시간 · 비용**: 라운드당 세션 3~8개를 순서대로 띄운다. 작은 변경(파일 1개) 한 판에 약 5분, 찾기 세션은 코드 양에 따라 길어진다(파일 28개짜리 폴더 하나에 찾기만 약 11분). `--all` 은 폴더 수만큼 반복한다
+- **비용 칸**: CLI 가 정가로 계산한 값이다. 구독 요금제의 실제 사용량과는 다르다 — 단계끼리 비교하는 데 쓴다
 - **기본 스킬 버전**: 찾기는 설치된 Claude Code 의 `code-review` 스킬을 그대로 쓴다. Claude Code 를 올리면 찾는 관점 · 결과 형식이 바뀔 수 있다 — 찾기 결과가 JSON 배열이 아니면 파이프라인이 멈추므로, 그때 `prompts/find.md` 를 맞춘다
 - **Windows**: Git Bash 에서 실행한다. 스크립트 줄바꿈은 LF 여야 한다 (`.gitattributes` 가 고정)
 - **재귀 방지**: 파이프라인은 `REVIEW_PIPELINE=1` 을 설정한다. Stop hook 등에서 이 값이 있으면 건너뛰게 한다

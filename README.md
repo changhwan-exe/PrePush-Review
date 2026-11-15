@@ -72,7 +72,8 @@ The built-in skills do "find → fix" in one go (`code-review --fix` · `simplif
 
 ## Requirements
 
-- git, bash 4.4+ (Git Bash on Windows)
+- git 2.38+ (`git merge-tree --write-tree`), bash 4.4+ (Git Bash on Windows)
+- Python 3 — used to read session results (JSON). The pipeline won't start without `python3` or `python`
 - Claude Code CLI — `claude` must be on PATH, in a version that includes the built-in `code-review` skill (verified on 2.1.322)
 
 ## Install
@@ -133,8 +134,21 @@ bash scripts/review/prepush.sh --all src/network     # a single folder
 
 | Mode | Target | Push |
 |---|---|---|
-| Pre-push | Code changed since the base branch | Yes if passed (not if fix commits were made) |
+| Pre-push | Code not pushed yet (see "Review scope" below) | Yes if passed (not if fix commits were made) |
 | Full `--all` | All existing code, folder by folder | No |
+
+### Review scope (pre-push)
+
+It first runs `git fetch` to bring remote refs up to date, then **skips commits that were already pushed** — the pre-push hook already checked they passed review when they were pushed.
+
+| Situation | Compared against |
+|---|---|
+| Branch pushed for the first time (no `origin/<branch>`) | Where it forked from the base branch (`REVIEW_BASE`) |
+| Branch already pushed | `origin/<branch>` — only commits after it |
+| Base branch merged in after pushing | A tree merging `origin/<branch>` with that base branch — code others put on the base branch drops out, leaving only your commits · conflict resolutions |
+| `origin/<branch>` is not an ancestor (rebase · someone else pushed), or the merge conflicts | Warns, then uses where it forked from the base branch |
+
+Commits pushed with `SKIP_REVIEW=1` or without the hook installed also count as "pushed" and are not reviewed again.
 
 **Docs-only work is not reviewed** — if the commits being pushed only touch `docs/` · `*.md`, the hook lets them through without review.
 
@@ -161,6 +175,8 @@ Result files are kept in `.review/latest/`.
 | `roundN/quality.md` | Design recommendations — `Q-` items not fixed. A human decides whether to fix them |
 | `roundN/prior.md` | Earlier-round record passed to that round's sessions |
 | `withdrawn.md` | Findings withdrawn in each round |
+| `usage.tsv` | One line per session — turns · input · cache write · cache read · output tokens · cost · seconds. The ` shows it with totals |
+| `*.md.json` · `*.md.err` | Each session's raw output (`claude -p --output-format json`) and error log |
 
 ## Ruling rules
 
@@ -202,6 +218,7 @@ Set in `scripts/review/review.conf`. An environment variable with the same name 
 ## Caveats
 
 - **Time · cost**: each round starts 3–8 sessions in sequence. A small change (1 file) takes about 5 minutes per run; the find session grows with the amount of code (one folder of 28 files took about 11 minutes for find alone). `--all` repeats per folder
+- **Cost column**: the price the CLI computes at list rates. It differs from actual usage on a subscription plan — use it to compare stages
 - **Built-in skill version**: find uses the installed Claude Code's `code-review` skill as-is. Upgrading Claude Code may change its angles · output format — if the find output is not a JSON array the pipeline stops, so then adjust `prompts/find.md`
 - **Windows**: run it in Git Bash. Script line endings must be LF (`.gitattributes` enforces this)
 - **Recursion guard**: the pipeline sets `REVIEW_PIPELINE=1`. Have Stop hooks etc. skip when it is set
